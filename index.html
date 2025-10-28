@@ -239,7 +239,8 @@
             where,
             orderBy,
             limit,
-            getDocs
+            getDocs,
+            runTransaction // <-- IMPORT runTransaction
         } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- Global Variables ---
@@ -607,44 +608,56 @@
 
             showMessage('Casting your vote...', 'success');
 
+            // --- MODIFICATION: Use a Transaction ---
             try {
-                const voterDocRef = doc(db, publicPollsCollectionPath, currentPollKey, 'voters', userId);
-                const voterSnap = await getDoc(voterDocRef);
+                // We will run two writes (set voter doc, update poll doc) in one transaction.
+                // This ensures both succeed or both fail.
+                await runTransaction(db, async (transaction) => {
+                    const pollDocRef = doc(db, publicPollsCollectionPath, currentPollKey);
+                    const voterDocRef = doc(db, publicPollsCollectionPath, currentPollKey, 'voters', userId);
 
-                if (voterSnap.exists()) {
-                    showMessage('You have already voted!', 'error');
-                    showView('voter-wait-view');
-                    return;
-                }
+                    // 1. Check if the user has already voted *inside* the transaction
+                    const voterSnap = await transaction.get(voterDocRef);
+                    if (voterSnap.exists()) {
+                        // Throw an error to stop the transaction
+                        throw new Error("You have already voted!");
+                    }
 
-                // 1. Record the user's vote in the 'voters' sub-collection
-                await setDoc(voterDocRef, {
-                    votedFor: itemId,
-                    timestamp: serverTimestamp()
+                    // 2. Record the user's vote in the 'voters' sub-collection
+                    transaction.set(voterDocRef, {
+                        votedFor: itemId,
+                        timestamp: serverTimestamp()
+                    });
+
+                    // 3. Increment the vote count on the main poll document
+                    // Use dot notation to update a field within a map
+                    const updatePayload = {};
+                    updatePayload[`items.${itemId}.votes`] = increment(1); 
+                    transaction.update(pollDocRef, updatePayload);
                 });
 
-                // 2. Increment the vote count on the main poll document
-                const pollDocRef = doc(db, publicPollsCollectionPath, currentPollKey);
-                // Use dot notation to update a field within a map
-                const updatePayload = {};
-                updatePayload[`items.${itemId}.votes`] = increment(1); 
-                await updateDoc(pollDocRef, updatePayload);
-
-                // Success! The onSnapshot listener will handle the UI update.
-                // Move to the results view.
+                // If the transaction is successful:
                 showMessage('Vote cast successfully!', 'success');
                 showView('voter-wait-view');
 
             } catch (error) {
                 console.error("Error casting vote: ", error);
-                showMessage('There was an error casting your vote.', 'error');
-                // Re-enable buttons if vote failed
-                document.querySelectorAll('.vote-btn').forEach(btn => {
-                    btn.disabled = false;
-                    btn.textContent = 'Vote for this';
-                    btn.classList.remove('opacity-50', 'cursor-not-allowed');
-                });
+                
+                // Handle different errors
+                if (error.message === "You have already voted!") {
+                    showMessage('You have already voted!', 'error');
+                    showView('voter-wait-view'); // Go to results
+                } else {
+                    showMessage('There was an error casting your vote.', 'error');
+                    // Re-enable buttons only if it was a general error
+                    document.querySelectorAll('.vote-btn').forEach(btn => {
+                        btn.disabled = false;
+                        btn.textContent = 'Vote for this';
+                        btn.classList.remove('opacity-50', 'cursor-not-allowed');
+                    });
+                }
             }
+            // --- END MODIFICATION ---
         }
 
         // --- Auth Functions ---
@@ -951,5 +964,6 @@
     </script>
 </body>
 </html>
+
 
 
