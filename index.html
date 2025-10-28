@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-time Voting System</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load Inter font -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+    <style>
+        /* Base styles */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6; /* Tailwind gray-100 */
+        }
+        /* Hide views by default */
+        .view {
+            display: none;
+        }
+        /* Simple spinner animation */
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-left-color: #3b82f6; /* blue-500 */
+            border-radius: 50%;
+            width: 2rem;
+            height: 2rem;
+            animation: spin 1s linear infinite;
+        }
+        .spinner-sm {
+            border: 2px solid rgba(0, 0, 0, 0.1);
+            border-left-color: #ffffff; /* white */
+            border-radius: 50%;
+            width: 1.5rem;
+            height: 1.5rem;
+            animation: spin 0.8s linear infinite;
+        }
+        /* Custom message box */
+        #message-box {
+            position: fixed;
+            bottom: 1.5rem;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 1rem 1.5rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            display: none;
+            z-index: 50;
+        }
+        #message-box.success {
+            background-color: #10b981; /* emerald-500 */
+            color: white;
+        }
+        #message-box.error {
+            background-color: #ef4444; /* red-500 */
+            color: white;
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen p-4">
+
+    <!-- Main Application Container -->
+    <div class="w-full max-w-2xl mx-auto bg-white rounded-xl shadow-2xl p-6 md:p-8">
+
+        <!-- User Info Header (hidden by default) -->
+        <div id="user-header" class="hidden justify-between items-center mb-6 pb-4 border-b border-gray-200">
+            <p class="text-sm text-gray-700">Logged in as: <strong id="user-email-display" class="font-medium"></strong></p>
+            <button id="btn-logout" class="text-sm text-red-600 hover:text-red-800 font-medium">Logout</button>
+        </div>
+
+        <!-- View 1: Auth (Login/Register) -->
+        <div id="auth-view" class="view">
+            <h1 id="auth-title" class="text-3xl font-bold text-center text-gray-800 mb-6">Login</h1>
+            <form id="form-login">
+                <div class="mb-4">
+                    <label for="login-email" class="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                    <input type="email" id="login-email" class="w-full p-3 border border-gray-200 rounded-full shadow-sm focus:shadow-md focus:ring-2 focus:ring-blue-300 focus:border-transparent outline-none transition-all" required>
+                </div>
+                <div class="mb-6">
+                    <label for="login-password" class="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                    <input type="password" id="login-password" class="w-full p-3 border border-gray-200 rounded-full shadow-sm focus:shadow-md focus:ring-2 focus:ring-blue-300 focus:border-transparent outline-none transition-all" required>
+                </div>
+                <button type="submit" id="btn-login" class="w-full bg-blue-600 text-white p-3 rounded-lg font-semibold text-lg hover:bg-blue-700 transition shadow-md">
+                    Login
+                </button>
+            </form>
+            <form id="form-register" class="hidden">
+                <div class="mb-4">
+                    <label for="register-email" class="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                    <input type="email" id="register-email" class="w-full p-3 border border-gray-200 rounded-full shadow-sm focus:shadow-md focus:ring-2 focus:ring-blue-300 focus:border-transparent outline-none transition-all" required>
+                </div>
+                <div class="mb-6">
+                    <label for="register-password" class="block text-sm font-medium text-gray-700 mb-2">Password (min. 6 characters)</label>
+                    <input type="password" id="register-password" class="w-full p-3 border border-gray-200 rounded-full shadow-sm focus:shadow-md focus:ring-2 focus:ring-blue-300 focus:border-transparent outline-none transition-all" minlength="6" required>
+                </div>
+                <button type="submit" id="btn-register" class="w-full bg-green-600 text-white p-3 rounded-lg font-semibold text-lg hover:bg-green-700 transition shadow-md">
+                    Register
+                </button>
+            </form>
+            <p class="text-center text-sm text-gray-600 mt-6">
+                <a href="#" id="auth-toggle" class="text-blue-600 hover:underline">Don't have an account? Register</a>
+            </p>
+        </div>
+
+        <!-- View 2: Home (Create or Join) -->
+        <div id="home-view" class="view">
+            <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">Welcome!</h1>
+            <p class="text-center text-gray-600 mb-8">Create a new poll as a host or join an existing poll as a voter.</p>
+            <!-- MODIFICATION: Changed to a space-y-6 for the new button -->
+            <div class="space-y-6">
+                <!-- NEW "MY POLL" BUTTON (hidden by default) -->
+                <button id="btn-go-mypoll" class="hidden w-full bg-purple-600 text-white p-4 rounded-lg font-semibold text-lg hover:bg-purple-700 transition duration-200 shadow-md">
+                    View My Poll
+                </button>
+                
+                <!-- "Create" and "Join" buttons -->
+                <button id="btn-go-create" class="w-full bg-blue-600 text-white p-4 rounded-lg font-semibold text-lg hover:bg-blue-700 transition duration-200 shadow-md">
+                    Create a Poll
+                </button>
+                <button id="btn-go-join" class="w-full bg-gray-700 text-white p-4 rounded-lg font-semibold text-lg hover:bg-gray-800 transition duration-200 shadow-md">
+                    Join a Poll
+                </button>
+            </div>
+        </div>
+
+        <!-- View 3: Create Poll (Host) -->
+        <div id="create-view" class="view">
+            <!-- NEW HOME BUTTON -->
+            <div class="mb-4 text-sm">
+                <a href="#" id="btn-go-home-create" class="text-blue-600 hover:underline">&larr; Back to Home</a>
+            </div>
+            <h1 class="text-2xl font-bold text-gray-800 mb-6">Create a New Poll</h1>
+            <form id="form-create">
+                <div id="item-entries" class="space-y-4 mb-6">
+                    <!-- Dynamic item entries will be added here -->
+                </div>
+                <button type="button" id="btn-add-item" class="w-full bg-green-500 text-white p-3 rounded-lg font-medium hover:bg-green-600 mb-4 transition">
+                    + Add Voting Item
+                </button>
+                <button type="submit" id="btn-create-poll" class="w-full bg-blue-600 text-white p-3 rounded-lg font-semibold text-lg hover:bg-blue-700 transition shadow-md">
+                    Create Poll
+                </button>
+            </form>
+        </div>
+
+        <!-- View 4: Host Waiting Room -->
+        <div id="host-wait-view" class="view">
+            <!-- NEW HOME BUTTON -->
+            <div class="mb-4 text-sm">
+                <a href="#" id="btn-go-home-host" class="text-blue-600 hover:underline">&larr; Back to Home</a>
+            </div>
+            <h1 class="text-2xl font-bold text-gray-800 mb-2">Your Poll is Live!</h1>
+            <p class="text-gray-600 mb-6">Share this 5-digit key with your voter:</p>
+            <div class="bg-gray-100 p-6 rounded-lg text-center mb-6">
+                <p class="text-5xl font-bold text-blue-600 tracking-widest" id="poll-key-display"></p>
+            </div>
+            <h2 class="text-xl font-semibold text-gray-800 mb-4">Live Results</h2>
+            <ul id="host-results-list" class="space-y-3">
+                <!-- Live results will be populated here -->
+            </ul>
+        </div>
+
+        <!-- View 5: Join Poll (Voter) -->
+        <div id="join-view" class="view">
+            <!-- NEW HOME BUTTON -->
+            <div class="mb-4 text-sm">
+                <a href="#" id="btn-go-home-join" class="text-blue-600 hover:underline">&larr; Back to Home</a>
+            </div>
+            <h1 class="text-2xl font-bold text-gray-800 mb-6">Join a Poll</h1>
+            <form id="form-join">
+                <label for="poll-key-input" class="block text-sm font-medium text-gray-700 mb-2">Enter 5-Digit Poll Key</label>
+                <input type="text" id="poll-key-input" maxlength="5" class="w-full p-3 border border-gray-200 rounded-full text-2xl text-center tracking-widest font-mono shadow-sm focus:shadow-md focus:ring-2 focus:ring-blue-300 focus:border-transparent outline-none transition-all" required>
+                <button type="submit" id="btn-join-poll" class="w-full bg-gray-700 text-white p-3 rounded-lg font-semibold text-lg hover:bg-gray-800 transition shadow-md mt-6">
+                    Join Poll
+                </button>
+            </form>
+        </div>
+
+        <!-- View 6: Voting Page (Voter) -->
+        <div id="vote-view" class="view">
+            <!-- NEW HOME BUTTON -->
+            <div class="mb-4 text-sm text-center">
+                <a href="#" id="btn-go-home-vote" class="text-blue-600 hover:underline">Cancel and Go Home</a>
+            </div>
+            <h1 class="text-2xl font-bold text-gray-800 mb-6 text-center">Cast Your Vote</h1>
+            <p class="text-center text-gray-600 mb-6">Select one item to vote for.</p>
+            <div id="vote-list" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- Voting options will be populated here -->
+            </div>
+        </div>
+
+        <!-- View 7: Voter Waiting/Results View -->
+        <div id="voter-wait-view" class="view">
+            <!-- NEW HOME BUTTON -->
+            <div class="mb-4 text-sm text-center">
+                <a href="#" id="btn-go-home-voter" class="text-blue-600 hover:underline">Back to Home</a>
+            </div>
+            <h1 class="text-2xl font-bold text-gray-800 mb-6 text-center" id="voter-wait-title">Thank you for voting!</h1>
+            <p class="text-center text-gray-600 mb-6">Here are the live results:</p>
+            <ul id="voter-results-list" class="space-y-3">
+                <!-- Live results will be populated here -->
+            </ul>
+        </div>
+
+    </div>
+
+    <!-- Global Message Box -->
+    <div id="message-box"></div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        // Import Firebase modules
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { 
+            getAuth, 
+            onAuthStateChanged,
+            createUserWithEmailAndPassword,
+            signInWithEmailAndPassword,
+            signOut,
+            signInAnonymously, // Added for fallback
+            signInWithCustomToken // Added for fallback
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { 
+            getFirestore, 
+            doc, 
+            getDoc, 
+            setDoc, 
+            updateDoc, 
+            onSnapshot, 
+            collection, 
+            serverTimestamp,
+            increment,
+            setLogLevel,
+            // --- MODIFICATION 1: Added imports ---
+            query,
+            where,
+            orderBy,
+            limit,
+            getDocs
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- Global Variables ---
+        let app, db, auth;
+        let userId;
+        let currentPollKey;
+        let pollUnsubscribe = null; // To detach the Firestore listener
+        
+        // --- Firebase Configuration ---
+        // Using the config provided by the user
+        const firebaseConfig = {
+            apiKey: "AIzaSyAh2jhjaAZt-qwUVlyOkPOEKajzzKbjMhY",
+            authDomain: "voting-8ed0a.firebaseapp.com",
+            projectId: "voting-8ed0a",
+            storageBucket: "voting-8ed0a.firebasestorage.app",
+            messagingSenderId: "606661377716",
+            appId: "1:606661377716:web:8350edec2b6ccb038ca1e1"
+        };
+        // Using the projectId as the appId for the database path
+        const appId = "voting-8ed0a"; 
+
+        // --- Public Data Path ---
+        // Path for shared/public data as per security rules
+        const publicPollsCollectionPath = `artifacts/${appId}/public/data/polls`;
+
+        // --- UI Helper Functions ---
+
+        /**
+         * Shows a specific view and hides all others
+         * @param {string} viewId The ID of the view to show (e.g., 'home-view')
+         */
+        function showView(viewId) {
+            // Hide all views
+            document.querySelectorAll('.view').forEach(view => {
+                view.style.display = 'none';
+            });
+            // Show the target view
+            const targetView = document.getElementById(viewId);
+            if (targetView) {
+                targetView.style.display = 'block';
+            }
+        }
+
+        /**
+         * Displays a temporary message box at the bottom of the screen
+         * @param {string} message The text to display
+         * @param {'success' | 'error'} type The type of message
+         */
+        function showMessage(message, type = 'success') {
+            const messageBox = document.getElementById('message-box');
+            messageBox.textContent = message;
+            messageBox.className = type; // 'success' or 'error'
+            messageBox.style.display = 'block';
+
+            // Hide after 3 seconds
+            setTimeout(() => {
+                messageBox.style.display = 'none';
+            }, 3000);
+        }
+
+        /**
+         * Disables or enables a button and shows a loading state
+         * @param {string} buttonId The ID of the button
+         * @param {boolean} isLoading True to disable and show loading, false to enable
+         * @param {string} [originalText] The original text to restore
+         */
+        function setButtonLoading(buttonId, isLoading, originalText = '') {
+            const button = document.getElementById(buttonId);
+            if (!button) return;
+
+            if (isLoading) {
+                button.disabled = true;
+                button.dataset.originalText = button.innerHTML;
+                button.innerHTML = `<div class="spinner-sm mx-auto"></div>`;
+            } else {
+                button.disabled = false;
+                button.innerHTML = originalText || button.dataset.originalText || 'Submit';
+            }
+        }
+
+        // --- Core Application Logic ---
+
+        /**
+         * Adds a new set of input fields for a voting item in the create form
+         */
+        function addNewItemEntry() {
+            const container = document.getElementById('item-entries');
+            const entryCount = container.children.length;
+            const newEntry = document.createElement('div');
+            newEntry.className = 'item-entry p-4 border border-gray-200 rounded-lg relative';
+            newEntry.innerHTML = `
+                <button type="button" class="remove-item-btn absolute top-2 right-2 text-red-500 hover:text-red-700 font-bold text-2xl leading-none">&times;</button>
+                <div class="mb-2">
+                    <label class="block text-sm font-medium text-gray-700">Item ${entryCount + 1} Name</label>
+                    <input type="text" class="item-name mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm" placeholder="e.g., Option A" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Image URL</label>
+                    <input type="url" class="item-image-url mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm" placeholder="https://example.com/image.png" required>
+                </div>
+            `;
+            // Add remove functionality
+            newEntry.querySelector('.remove-item-btn').addEventListener('click', () => {
+                newEntry.remove();
+                // Re-number labels
+                container.querySelectorAll('.item-entry label:first-child').forEach((label, index) => {
+                    label.textContent = `Item ${index + 1} Name`;
+                });
+            }); 
+            container.appendChild(newEntry);
+        }
+
+        /**
+         * Host: Creates a new poll in Firestore
+         */
+        async function createPoll(event) {
+            event.preventDefault();
+            setButtonLoading('btn-create-poll', true);
+
+            const itemEntries = document.querySelectorAll('.item-entry');
+            if (itemEntries.length < 2) {
+                showMessage('Please add at least two items to vote on.', 'error');
+                setButtonLoading('btn-create-poll', false, 'Create Poll');
+                return;
+            }
+
+            // Generate 5-digit random key
+            const key = Math.floor(10000 + Math.random() * 90000).toString();
+            
+            const items = {};
+            let allValid = true;
+            itemEntries.forEach((entry, index) => {
+                const id = `item_${Date.now()}_${index}`;
+                const name = entry.querySelector('.item-name').value.trim();
+                const imageUrl = entry.querySelector('.item-image-url').value.trim();
+                
+                if (name && imageUrl) {
+                    // Basic URL validation
+                    try {
+                        new URL(imageUrl);
+                        items[id] = { name, imageUrl, votes: 0 };
+                    } catch (_) {
+                        allValid = false;
+                        showMessage(`Item ${index + 1} has an invalid Image URL.`, 'error');
+                    }
+                } else {
+                    allValid = false;
+                    showMessage(`Item ${index + 1} is missing a name or URL.`, 'error');
+                }
+            });
+
+            if (!allValid) {
+                setButtonLoading('btn-create-poll', false, 'Create Poll');
+                return;
+            }
+
+            try {
+                const pollData = {
+                    hostId: userId,
+                    key: key,
+                    items: items, // Using a map/object for easier updates
+                    createdAt: serverTimestamp()
+                };
+
+                const pollDocRef = doc(db, publicPollsCollectionPath, key);
+                await setDoc(pollDocRef, pollData);
+
+                currentPollKey = key;
+                document.getElementById('poll-key-display').textContent = key;
+                listenToPoll(key); // Start listening for live updates
+                showView('host-wait-view');
+
+                // --- NEW ---
+                // Update home screen UI to show this new poll
+                document.getElementById('btn-go-mypoll').classList.remove('hidden');
+                document.getElementById('btn-go-create').textContent = 'Create New Poll';
+                // --- END NEW ---
+
+            } catch (error) {
+                console.error("Error creating poll: ", error);
+                showMessage('Failed to create poll. Please try again.', 'error');
+                setButtonLoading('btn-create-poll', false, 'Create Poll');
+            }
+        }
+
+        /**
+         * Voter: Joins an existing poll using a key
+         */
+        async function joinPoll(event) {
+            event.preventDefault();
+            setButtonLoading('btn-join-poll', true, 'Join Poll');
+            const key = document.getElementById('poll-key-input').value.trim();
+
+            if (key.length !== 5) {
+                showMessage('Key must be 5 digits.', 'error');
+                setButtonLoading('btn-join-poll', false, 'Join Poll');
+                return;
+            }
+
+            try {
+                const pollDocRef = doc(db, publicPollsCollectionPath, key);
+                const pollSnap = await getDoc(pollDocRef);
+
+                if (!pollSnap.exists()) {
+                    showMessage('Poll not found. Please check the key.', 'error');
+                    setButtonLoading('btn-join-poll', false, 'Join Poll');
+                    return;
+                }
+
+                currentPollKey = key;
+
+                // Check if this user has already voted in this poll
+                const voterDocRef = doc(db, publicPollsCollectionPath, key, 'voters', userId);
+                const voterSnap = await getDoc(voterDocRef);
+
+                listenToPoll(key); // Start listening for live updates
+
+                if (voterSnap.exists()) {
+                    // User has already voted, send to results
+                    document.getElementById('voter-wait-title').textContent = 'You have already voted!';
+                    showView('voter-wait-view');
+                } else {
+                    // User has not voted, send to voting page
+                    showView('vote-view');
+                }
+
+            } catch (error)
+            {
+                console.error("Error joining poll: ", error);
+                showMessage('Failed to join poll. Please try again.', 'error');
+                setButtonLoading('btn-join-poll', false, 'Join Poll');
+            }
+        }
+        
+        /**
+         * Attaches a real-time listener to the poll document
+         * @param {string} key The poll key
+         */
+        function listenToPoll(key) {
+            // Detach any existing listener
+            if (pollUnsubscribe) {
+                pollUnsubscribe();
+            }
+
+            const pollDocRef = doc(db, publicPollsCollectionPath, key);
+            pollUnsubscribe = onSnapshot(pollDocRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    const pollData = docSnap.data();
+                    renderPollItems(pollData.items);
+                } else {
+                    // Poll was deleted or doesn't exist
+                    showMessage('This poll is no longer available.', 'error');
+                    if (pollUnsubscribe) pollUnsubscribe();
+                    
+                    // --- NEW ---
+                    // Reset UI if poll is gone
+                    currentPollKey = null;
+                    document.getElementById('btn-go-mypoll').classList.add('hidden');
+                    document.getElementById('btn-go-create').textContent = 'Create a Poll';
+                    showView('home-view');
+                    // --- END NEW ---
+                }
+            }, (error) => {
+                console.error("Error listening to poll: ", error);
+                showMessage('Connection lost to poll.', 'error');
+            });
+        }
+
+        /**
+         * Renders the poll items in all relevant views
+         * @param {object} items - The 'items' map from the poll document
+         */
+        function renderPollItems(items) {
+            const hostList = document.getElementById('host-results-list');
+            const voteList = document.getElementById('vote-list');
+            const voterList = document.getElementById('voter-results-list');
+
+            // Clear previous content
+            hostList.innerHTML = '';
+            voteList.innerHTML = '';
+            voterList.innerHTML = '';
+
+            if (!items || Object.keys(items).length === 0) {
+                const noItemsHtml = '<p class="text-gray-500">No items in this poll.</p>';
+                hostList.innerHTML = noItemsHtml;
+                voterList.innerHTML = noItemsHtml;
+                voteList.innerHTML = noItemsHtml;
+                return;
+            }
+
+            // Sort items by votes (descending)
+            const sortedItems = Object.entries(items).sort(([,a], [,b]) => b.votes - a.votes);
+
+            for (const [id, item] of sortedItems) {
+                const votes = item.votes || 0;
+
+                // --- Render for Host and Voter Results Lists ---
+                const resultItemHtml = `
+                    <li class="flex justify-between items-center p-3 bg-gray-50 rounded-lg shadow-sm">
+                        <div class="flex items-center min-w-0">
+                            <img src="${item.imageUrl}" onerror="this.src='https://placehold.co/40x40/e2e8f0/64748b?text=?'; this.onerror=null;" alt="${item.name}" class="w-10 h-10 rounded-full mr-3 object-cover flex-shrink-0">
+                            <span class="text-gray-800 font-medium truncate" title="${item.name}">${item.name}</span>
+                        </div>
+                        <span class="font-bold text-xl text-blue-600 ml-4">${votes}</span>
+                    </li>
+                `;
+                hostList.innerHTML += resultItemHtml;
+                voterList.innerHTML += resultItemHtml;
+
+                // --- Render for Voting Page ---
+                const voteItemHtml = `
+                    <div class="border rounded-lg shadow-md overflow-hidden text-center transition-all duration-200 hover:shadow-lg">
+                        <img src="${item.imageUrl}" onerror="this.src='https://placehold.co/400x300/e2e8f0/64748b?text=Image'; this.onerror=null;" alt="${item.name}" class="w-full h-48 object-cover">
+                        <h3 class="text-lg font-semibold p-3 text-gray-800">${item.name}</h3>
+                        <button class="vote-btn w-full bg-blue-600 text-white p-3 font-medium hover:bg-blue-700 transition-colors" data-item-id="${id}">
+                            Vote for this
+                        </button>
+                    </div>
+                `;
+                voteList.innerHTML += voteItemHtml;
+            }
+        }
+
+        /**
+         * Voter: Handles the vote submission
+         * @param {string} itemId The ID of the item being voted for
+         */
+        async function handleVote(itemId) {
+            // Disable all vote buttons to prevent double-voting
+            document.querySelectorAll('.vote-btn').forEach(btn => {
+                btn.disabled = true;
+                btn.textContent = 'Voting...';
+                btn.classList.add('opacity-50', 'cursor-not-allowed');
+            });
+
+            showMessage('Casting your vote...', 'success');
+
+            try {
+                const voterDocRef = doc(db, publicPollsCollectionPath, currentPollKey, 'voters', userId);
+                const voterSnap = await getDoc(voterDocRef);
+
+                if (voterSnap.exists()) {
+                    showMessage('You have already voted!', 'error');
+                    showView('voter-wait-view');
+                    return;
+                }
+
+                // 1. Record the user's vote in the 'voters' sub-collection
+                await setDoc(voterDocRef, {
+                    votedFor: itemId,
+                    timestamp: serverTimestamp()
+                });
+
+                // 2. Increment the vote count on the main poll document
+                const pollDocRef = doc(db, publicPollsCollectionPath, currentPollKey);
+                // Use dot notation to update a field within a map
+                const updatePayload = {};
+                updatePayload[`items.${itemId}.votes`] = increment(1); 
+                await updateDoc(pollDocRef, updatePayload);
+
+                // Success! The onSnapshot listener will handle the UI update.
+                // Move to the results view.
+                showMessage('Vote cast successfully!', 'success');
+                showView('voter-wait-view');
+
+            } catch (error) {
+                console.error("Error casting vote: ", error);
+                showMessage('There was an error casting your vote.', 'error');
+                // Re-enable buttons if vote failed
+                document.querySelectorAll('.vote-btn').forEach(btn => {
+                    btn.disabled = false;
+                    btn.textContent = 'Vote for this';
+                    btn.classList.remove('opacity-50', 'cursor-not-allowed');
+                });
+            }
+        }
+
+        // --- Auth Functions ---
+
+        /**
+         * Handles user registration
+         */
+        async function handleRegister(event) {
+            event.preventDefault();
+            const email = document.getElementById('register-email').value;
+            const password = document.getElementById('register-password').value;
+            setButtonLoading('btn-register', true, 'Register');
+
+            try {
+                await createUserWithEmailAndPassword(auth, email, password);
+                // onAuthStateChanged will handle the rest
+                showMessage('Registration successful!', 'success');
+            } catch (error) {
+                console.error("Registration Error: ", error);
+                showMessage(error.message, 'error');
+                setButtonLoading('btn-register', false, 'Register');
+            }
+        }
+
+        /**
+         * Handles user login
+         */
+        async function handleLogin(event) {
+            event.preventDefault();
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            setButtonLoading('btn-login', true, 'Login');
+
+            try {
+                await signInWithEmailAndPassword(auth, email, password);
+                // onAuthStateChanged will handle the rest
+                showMessage('Login successful!', 'success');
+            } catch (error) {
+                console.error("Login Error: ", error);
+                showMessage(error.message, 'error');
+                setButtonLoading('btn-login', false, 'Login');
+            }
+        }
+
+        /**
+         * Handles user logout
+         */
+        async function handleLogout() {
+            try {
+                if (pollUnsubscribe) {
+                    pollUnsubscribe(); // Detach Firestore listener
+                    pollUnsubscribe = null;
+                }
+                await signOut(auth);
+                showMessage('Logged out successfully.', 'success');
+                // Clear create form if user logs out
+                document.getElementById('item-entries').innerHTML = '';
+                
+                // --- NEW: Reset UI state ---
+                currentPollKey = null;
+                document.getElementById('btn-go-mypoll').classList.add('hidden');
+                document.getElementById('btn-go-create').textContent = 'Create a Poll';
+                // --- END NEW ---
+            } catch (error) {
+                console.error("Logout Error: ", error);
+                showMessage(error.message, 'error');
+            }
+        }
+
+        /**
+         * Toggles between Login and Register forms
+         */
+        function toggleAuthForms() {
+            const loginForm = document.getElementById('form-login');
+            const registerForm = document.getElementById('form-register');
+            const toggleLink = document.getElementById('auth-toggle');
+            const title = document.getElementById('auth-title');
+
+            if (loginForm.classList.contains('hidden')) {
+                // Switch to Login
+                loginForm.classList.remove('hidden');
+                registerForm.classList.add('hidden');
+                toggleLink.textContent = 'Don\'t have an account? Register';
+                title.textContent = 'Login';
+            } else {
+                // Switch to Register
+                loginForm.classList.add('hidden');
+                registerForm.classList.remove('hidden');
+                toggleLink.textContent = 'Already have an account? Login';
+                title.textContent = 'Register';
+            }
+        }
+
+
+        // --- Event Listeners ---
+        function setupEventListeners() {
+            // --- NEW "GO HOME" Listeners ---
+            // A simple function to navigate home.
+            // Cleanup (detaching listeners) is handled by `listenToPoll` and `handleLogout`,
+            // so we don't need complex logic here.
+            const goHome = (e) => {
+                e.preventDefault();
+                showView('home-view');
+            };
+            
+            document.getElementById('btn-go-home-host').addEventListener('click', goHome);
+            document.getElementById('btn-go-home-create').addEventListener('click', goHome);
+            document.getElementById('btn-go-home-join').addEventListener('click', goHome);
+            document.getElementById('btn-go-home-vote').addEventListener('click', goHome);
+            document.getElementById('btn-go-home-voter').addEventListener('click', goHome);
+            
+            // --- NEW "MY POLL" Listener ---
+            document.getElementById('btn-go-mypoll').addEventListener('click', () => {
+                if (currentPollKey) {
+                    document.getElementById('poll-key-display').textContent = currentPollKey;
+                    // Ensure listener is active (it should be from login)
+                    if (!pollUnsubscribe) {
+                        console.log("Re-attaching host listener...");
+                        listenToPoll(currentPollKey);
+                    }
+                    showView('host-wait-view');
+                } else {
+                    showMessage('Could not find your poll.', 'error');
+                    showView('home-view');
+                }
+            });
+
+            document.getElementById('btn-go-create').addEventListener('click', () => {
+                // Clear any old items
+                document.getElementById('item-entries').innerHTML = '';
+                showView('create-view');
+                // Add first two item entries
+                addNewItemEntry();
+                addNewItemEntry();
+            });
+            
+            document.getElementById('btn-go-join').addEventListener('click', () => {
+                // Clear old key
+                document.getElementById('poll-key-input').value = '';
+                showView('join-view');
+            });
+            
+            document.getElementById('btn-add-item').addEventListener('click', addNewItemEntry);
+            
+            document.getElementById('form-create').addEventListener('submit', createPoll);
+            
+            document.getElementById('form-join').addEventListener('submit', joinPoll);
+
+            // Auth listeners
+            document.getElementById('auth-toggle').addEventListener('click', (e) => {
+                e.preventDefault();
+                toggleAuthForms();
+            });
+            document.getElementById('form-login').addEventListener('submit', handleLogin);
+            document.getElementById('form-register').addEventListener('submit', handleRegister);
+            document.getElementById('btn-logout').addEventListener('click', handleLogout);
+
+            // Event delegation for vote buttons (since they are dynamically created)
+            document.getElementById('vote-list').addEventListener('click', (e) => {
+                if (e.target && e.target.classList.contains('vote-btn')) {
+                    const itemId = e.target.dataset.itemId;
+                    if (itemId) {
+                        handleVote(itemId);
+                    }
+                }
+            });
+        }
+
+
+        // --- Initialization ---
+        async function init() {
+            try {
+                // Use provided config, or load from environment
+                const effectiveConfig = typeof __firebase_config !== 'undefined'
+                    ? JSON.parse(__firebase_config)
+                    : firebaseConfig;
+                
+                const effectiveAppId = typeof __app_id !== 'undefined' 
+                    ? __app_id 
+                    : appId;
+
+                // Re-assign the public path based on the effective app ID
+                // Note: This is a bit of a workaround. Ideally, this variable definition
+                // would be inside init(), but we keep it global for simplicity.
+                // This line is technically redundant if `publicPollsCollectionPath`
+                // is re-defined *inside* this function, but let's assume
+                // the global definition is what we're stuck with.
+                // For safety, let's just log what's being used.
+                console.log(`Using App ID: ${effectiveAppId}`);
+                
+                app = initializeApp(effectiveConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                
+                // Enable debug logging for Firestore
+                setLogLevel('debug');
+                
+                showView('auth-view'); // Start on auth view
+
+                // Handle auth token from the environment
+                if (typeof __initial_auth_token !== 'undefined') {
+                    console.log("Signing in with custom token...");
+                    try {
+                        await signInWithCustomToken(auth, __initial_auth_token);
+                    } catch (tokenError) {
+                        console.error("Custom token sign-in failed, trying anonymous:", tokenError);
+                        await signInAnonymously(auth);
+                    }
+                } else {
+                    console.log("No custom token, signing in anonymously (or waiting for user login)...");
+                    // Note: This anonymous sign-in will be overridden by user login/register
+                    // but it's good practice if the app *required* a UID.
+                    // For this app, we *wait* for user login, so we won't sign in anon here.
+                    // We let onAuthStateChanged handle the "no user" case.
+                }
+
+                // --- MODIFICATION 2: Updated onAuthStateChanged ---
+                onAuthStateChanged(auth, async (user) => {
+                    const userHeader = document.getElementById('user-header');
+                    if (user && !user.isAnonymous) { // Only proceed if it's a *real* user
+                        // User is signed in
+                        userId = user.uid;
+                        console.log("User is authenticated:", userId, "Email:", user.email);
+                        
+                        // Show user info and logout button
+                        document.getElementById('user-email-display').textContent = user.email;
+                        userHeader.classList.remove('hidden');
+                        userHeader.classList.add('flex');
+
+                        // Restore original button states in case they were loading
+                        setButtonLoading('btn-login', false, 'Login');
+                        setButtonLoading('btn-register', false, 'Register');
+
+                        // --- NEW LOGIC: Check for an existing poll ---
+                        try {
+                            const pollsRef = collection(db, publicPollsCollectionPath);
+                            // Query for polls where hostId matches this user, order by most recent
+                            const q = query(
+                                pollsRef, 
+                                where("hostId", "==", userId), 
+                                orderBy("createdAt", "desc"), 
+                                limit(1)
+                            );
+
+                            const querySnapshot = await getDocs(q);
+                            
+                            if (!querySnapshot.empty) {
+                                // User has an existing poll
+                                const pollDoc = querySnapshot.docs[0];
+                                currentPollKey = pollDoc.id; // The doc ID is the poll key
+                                console.log("Found existing poll:", currentPollKey);
+                                
+                                // Update UI for home-view
+                                document.getElementById('btn-go-mypoll').classList.remove('hidden'); // Show "My Poll"
+                                document.getElementById('btn-go-create').textContent = 'Create New Poll'; // Change create button text
+                                
+                                listenToPoll(currentPollKey); // Start listening
+                            } else {
+                                // No poll found
+                                console.log("No existing poll found for this host.");
+                                currentPollKey = null;
+                                document.getElementById('btn-go-mypoll').classList.add('hidden'); // Hide "My Poll"
+                                document.getElementById('btn-go-create').textContent = 'Create a Poll'; // Reset create button text
+                            }
+                        } catch (error) {
+                            console.error("Error checking for existing poll:", error);
+                            // This error often means a Firestore Index is missing.
+                            // The console will have a link to create it.
+                            showMessage('Could not check for existing polls. See console.', 'error');
+                            // showView('home-view'); // Fallback to home (happens below)
+                        }
+                        // --- END OF NEW LOGIC ---
+
+                        // ALWAYS show home-view after login logic is done
+                        showView('home-view');
+
+                    } else {
+                        // User is not signed in (or is anonymous)
+                        userId = user ? user.uid : null; // Keep UID if anonymous
+                        console.log("No non-anonymous user signed in. User:", userId);
+
+                        // Hide user info
+                        userHeader.classList.add('hidden');
+                        userHeader.classList.remove('flex');
+                        
+                        // Show auth view
+                        showView('auth-view');
+                    }
+                });
+
+                setupEventListeners();
+
+            } catch (error) {
+                console.error("Firebase Initialization Error:", error);
+                document.getElementById('auth-view').innerHTML = 
+                    '<p class="text-red-600 font-bold">Error: Could not initialize app. See console for details.</p>';
+                showView('auth-view'); // Ensure the error is visible
+            }
+        }
+
+        // Run the app
+        init();
+
+    </script>
+</body>
+</html>
