@@ -378,22 +378,21 @@
                 const imageUrl = entry.querySelector('.item-image-url').value.trim();
                 
                 if (name && imageUrl) {
-                    // --- MODIFICATION: Stronger URL validation ---
-                    let isValidImage = true;
+                    // --- MODIFICATION: Relaxed URL validation ---
+                    // We will no longer check for image extensions, as this
+                    // blocks valid links from services like Google Photos.
+                    // The `onerror` handler in `renderPollItems` will
+                    // gracefully handle links that cannot be hotlinked.
+                    let isValidUrl = true;
                     try {
                         new URL(imageUrl);
-                        // Check for common image extensions
-                        const lowerUrl = imageUrl.toLowerCase();
-                        if (!lowerUrl.match(/\.(jpeg|jpg|gif|png|webp|bmp|svg)$/)) {
-                            isValidImage = false;
-                            showMessage(`Item ${index + 1} URL doesn't look like an image. (Missing .jpg, .png, etc.)`, 'error');
-                        }
+                        // The URL format is valid.
                     } catch (_) {
-                        isValidImage = false;
+                        isValidUrl = false;
                         showMessage(`Item ${index + 1} has an invalid Image URL format.`, 'error');
                     }
 
-                    if (isValidImage) {
+                    if (isValidUrl) {
                         items[id] = { name, imageUrl, votes: 0 };
                     } else {
                         allValid = false;
@@ -964,6 +963,5 @@
     </script>
 </body>
 </html>
-
 
 
