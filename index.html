@@ -377,14 +377,28 @@
                 const imageUrl = entry.querySelector('.item-image-url').value.trim();
                 
                 if (name && imageUrl) {
-                    // Basic URL validation
+                    // --- MODIFICATION: Stronger URL validation ---
+                    let isValidImage = true;
                     try {
                         new URL(imageUrl);
-                        items[id] = { name, imageUrl, votes: 0 };
+                        // Check for common image extensions
+                        const lowerUrl = imageUrl.toLowerCase();
+                        if (!lowerUrl.match(/\.(jpeg|jpg|gif|png|webp|bmp|svg)$/)) {
+                            isValidImage = false;
+                            showMessage(`Item ${index + 1} URL doesn't look like an image. (Missing .jpg, .png, etc.)`, 'error');
+                        }
                     } catch (_) {
-                        allValid = false;
-                        showMessage(`Item ${index + 1} has an invalid Image URL.`, 'error');
+                        isValidImage = false;
+                        showMessage(`Item ${index + 1} has an invalid Image URL format.`, 'error');
                     }
+
+                    if (isValidImage) {
+                        items[id] = { name, imageUrl, votes: 0 };
+                    } else {
+                        allValid = false;
+                        // showMessage is already called above
+                    }
+                    // --- END MODIFICATION ---
                 } else {
                     allValid = false;
                     showMessage(`Item ${index + 1} is missing a name or URL.`, 'error');
@@ -552,7 +566,23 @@
                 // --- Render for Voting Page ---
                 const voteItemHtml = `
                     <div class="border rounded-lg shadow-md overflow-hidden text-center transition-all duration-200 hover:shadow-lg">
-                        <img src="${item.imageUrl}" onerror="this.src='https://placehold.co/400x300/e2e8f0/64748b?text=Image'; this.onerror=null;" alt="${item.name}" class="w-full h-48 object-cover">
+                        
+                        <!-- MODIFICATION: 
+                             Added a wrapper div. The 'onerror' will now replace the 
+                             img with a clickable 'a' tag inside this wrapper. 
+                        -->
+                        <div class="w-full h-48 bg-gray-100">
+                            <img src="${item.imageUrl}" 
+                                 onerror="this.parentElement.innerHTML = \`
+                                    <a href='${item.imageUrl}' target='_blank' rel='noopener noreferrer' 
+                                       class='flex items-center justify-center h-full text-blue-600 hover:text-blue-800 underline p-4 text-center'>
+                                       Image failed to load.<br>Click to view in new tab
+                                    </a>
+                                 \`" 
+                                 alt="${item.name}" class="w-full h-48 object-cover">
+                        </div>
+                        <!-- END MODIFICATION -->
+
                         <h3 class="text-lg font-semibold p-3 text-gray-800">${item.name}</h3>
                         <button class="vote-btn w-full bg-blue-600 text-white p-3 font-medium hover:bg-blue-700 transition-colors" data-item-id="${id}">
                             Vote for this
@@ -921,3 +951,5 @@
     </script>
 </body>
 </html>
+
+
